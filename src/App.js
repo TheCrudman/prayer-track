@@ -10,7 +10,6 @@ const GET_PRAYERS = gql`
   query getPrayers {
     prayers {
       text
-      category
       answered
       id
       added_by
@@ -19,11 +18,13 @@ const GET_PRAYERS = gql`
   }
 `
 
-const TOGGLE_TODO = gql`
-  mutation toggleTodo($id: uuid!, $done: Boolean!) {
-    update_todos(where: { id: { _eq: $id } }, _set: { done: $done }) {
+const TOGGLE_PRAYER = gql`
+  mutation toggleTodo($id: uuid!, $answered: Boolean!) {
+    update_prayers(where: { id: { _eq: $id } }, _set: { answered: $answered }) {
       returning {
-        done
+        added_by
+        answered
+        created_at
         id
         text
       }
@@ -31,11 +32,13 @@ const TOGGLE_TODO = gql`
   }
 `
 
-const ADD_TODO = gql`
-  mutation addTodo($text: String!) {
-    insert_todos(objects: { text: $text }) {
+const ADD_PRAYER = gql`
+  mutation addPrayer($added_by: String = "", $text: String = "") {
+    insert_prayers(objects: { text: $text, added_by: $added_by }) {
       returning {
-        done
+        added_by
+        answered
+        created_at
         id
         text
       }
@@ -43,11 +46,13 @@ const ADD_TODO = gql`
   }
 `
 
-const DELETE_TODO = gql`
-  mutation deleteTodo($id: uuid!) {
-    delete_todos(where: { id: { _eq: $id } }) {
+const DELETE_PRAYER = gql`
+  mutation deletePrayer($id: uuid!) {
+    delete_prayers(where: { id: { _eq: $id } }) {
       returning {
-        done
+        added_by
+        answered
+        created_at
         id
         text
       }
@@ -64,48 +69,55 @@ const DELETE_TODO = gql`
 // delete todos
 
 function App() {
-  const [user, setUser] = React.useState('will')
-  const [todoText, setTodoText] = React.useState('')
+  const [user, setUser] = React.useState('')
+  const [prayerText, setPrayerText] = React.useState('')
   const { data, loading, error } = useQuery(GET_PRAYERS)
-  const [toggleTodo] = useMutation(TOGGLE_TODO)
-  const [addTodo] = useMutation(ADD_TODO, {
-    onCompleted: () => setTodoText(''),
+  const [togglePrayer] = useMutation(TOGGLE_PRAYER)
+  const [addPrayer] = useMutation(ADD_PRAYER, {
+    onCompleted: () => setPrayerText(''),
   })
-  const [deleteTodo] = useMutation(DELETE_TODO)
+  const [deletePrayer] = useMutation(DELETE_PRAYER)
 
   // function handleToggleTodo(todo) {
   //   toggleTodo({ variables: { id: todo.id, done: !todo.done } }).then((data) =>
   //     console.log(data)
   // }
-  async function handleToggleTodo({ id, done }) {
-    const data = await toggleTodo({ variables: { id, done: !done } })
-    console.log('toggled todo', data)
+  async function handleTogglePrayer({ id, answered }) {
+    const data = await togglePrayer({ variables: { id, answered: !answered } })
+    console.log('toggled prayer status', data)
   }
 
-  async function handleAddTodo(event) {
+  async function handleAddPrayer(event) {
     event.preventDefault()
-    if (!todoText.trim()) return
+    if (!prayerText.trim()) return
 
-    const data = await addTodo({
-      variables: { text: todoText },
+    const data = await addPrayer({
+      variables: { text: prayerText, added_by: user },
       refetchQueries: [{ query: GET_PRAYERS }],
     })
-    console.log('added todo', data)
+    console.log('added prayer', data)
     // setTodoText('')
   }
 
-  async function handleDeleteTo({ id }) {
-    const isConfirmed = window.confirm('Do you want to delete this todo?')
+  async function handleDeletePrayer({ id }) {
+    const isConfirmed = window.confirm(
+      'Do you want to delete this prayer item?'
+    )
     if (isConfirmed) {
-      const data = await deleteTodo({
+      const data = await deletePrayer({
         variables: { id },
         update: (cache) => {
           const prevData = cache.readQuery({ query: GET_PRAYERS })
-          const newTodos = prevData.todos.filter((todo) => todo.id !== id)
-          cache.writeQuery({ query: GET_PRAYERS, data: { todos: newTodos } })
+          const newPrayers = prevData.prayers.filter(
+            (prayer) => prayer.id !== id
+          )
+          cache.writeQuery({
+            query: GET_PRAYERS,
+            data: { prayers: newPrayers },
+          })
         },
       })
-      console.log('deleted todo', data)
+      console.log('deleted prayer item', data)
     }
   }
 
@@ -120,13 +132,13 @@ function App() {
           <Login setUser={setUser} />
         ) : (
           <div>
-            <form onSubmit={handleAddTodo} className="mb3">
+            <form onSubmit={handleAddPrayer} className="mb3">
               <input
                 className="pa2 f4 b--dashed"
                 type="text"
                 placeholder="Pray about..."
-                onChange={(event) => setTodoText(event.target.value)}
-                value={todoText}
+                onChange={(event) => setPrayerText(event.target.value)}
+                value={prayerText}
               />
               &nbsp;
               <button className="pa2 f4 bg-green" type="submit">
@@ -138,7 +150,7 @@ function App() {
         )}
         <div className="flex items-center justify-center flex-column">
           {data.prayers.map((prayer) => (
-            <p onDoubleClick={() => handleToggleTodo(prayer)} key={prayer.id}>
+            <p onDoubleClick={() => handleTogglePrayer(prayer)} key={prayer.id}>
               &nbsp;
               <span
                 className={`pointer list pa1 f3 ${prayer.answered && 'strike'}`}
@@ -150,7 +162,7 @@ function App() {
               )}
               &nbsp;
               <button
-                onClick={() => handleDeleteTo(prayer)}
+                onClick={() => handleDeletePrayer(prayer)}
                 className="bg-transparent bn f4"
               >
                 <span className="red">&times;</span>
