@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom'
 import App from './App'
 //import ApolloClient from '@apollo/client'
 import { ApolloClient, ApolloProvider, InMemoryCache } from '@apollo/client'
+import './style.css'
 
 const client = new ApolloClient({
   uri: 'https://pray-track.hasura.app/v1/graphql',
